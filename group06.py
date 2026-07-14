@@ -1,6 +1,7 @@
 import sys
 import os
 import pygame
+import random
 
 
 # 実行ファイルのディレクトリにカレントディレクトリを変更（素材やスコアファイルの読み込みエラー防止）
@@ -28,8 +29,80 @@ YELLOW = (255, 215, 0)
 ORANGE = (255, 120, 0) #追加
 CYAN = (255, 122, 0) #追加
 
+# 落ちてくるアイテム
+ITEM_DEFINITIONS = [
+    {"file": "apple.png", "type": "good"},
+    {"file": "banana.png", "type": "good"},
+    {"file": "peach.png", "type": "good"},
+    {"file": "strawberry.png", "type": "good"},
+    {"file": "watermelon.png", "type": "good"},
+    {"file": "avocado_dmg.png", "type": "bad"},  # これだけマイナスアイテム
+]
+
 FONT_FILE = "PixelMplus12-Regular.ttf" #追加G　使用するドットフォントのファイル名
 HIGHSCORE_FILE = "highscore.txt"
+
+# 背景画像など
+class Bird:
+    """
+    ゲームキャラクター（こうかとん）に関するクラス
+    機能ボタンを押されたら左右に動く機能
+    """
+    delta = {  # 押下キーと移動量の辞書
+        # pg.K_UP: (0, -5),      # 上キーが押されたら Y座標を -5（上に移動）
+        # pg.K_DOWN: (0, +5),    # 下キーが押されたら Y座標を +5（下に移動）
+        pygame.K_LEFT: (-5, 0),
+        pygame.K_RIGHT: (+5, 0),
+    }
+    img0 = pygame.transform.rotozoom(pygame.image.load("fig/3.png"), 0, 1) # デフォルトのこうかとん
+    img = pygame.transform.flip(img0, True, False)  # 左右反転して右向きに　上下反転しない
+    imgs = {  # 0度から反時計回りに定義
+        (+5, 0): img,  # 右
+        (+5, -5): pygame.transform.rotozoom(img, 45, 0.9),  # 右上
+        (0, -5): pygame.transform.rotozoom(img, 90, 0.9),  # 上
+        (-5, -5): pygame.transform.rotozoom(img0, -45, 0.9),  # 左上
+        (-5, 0): img0,  # 左
+        (-5, +5): pygame.transform.rotozoom(img0, 45, 0.9),  # 左下
+        (0, +5): pygame.transform.rotozoom(img, -90, 0.9),  # 下
+        (+5, +5): pygame.transform.rotozoom(img, -45, 0.9),  # 右下
+    }
+
+    def __init__(self, xy: tuple[int, int]):
+        """
+        こうかとん画像Surfaceを生成する
+        引数 xy：こうかとん画像の初期位置座標タプル
+        """
+        self.img = __class__.imgs[(+5, 0)]
+        self.img = pygame.image.load("img/basket.png").convert_alpha()
+        self.rct: pygame.Rect = self.img.get_rect()
+        self.rct.center = xy
+
+    def change_img(self, num: int, screen: pygame.Surface):
+        """
+        こうかとん画像を切り替え，画面に転送する
+        引数1 num：こうかとん画像ファイル名の番号
+        引数2 screen：画面Surface
+        """
+        self.img = pygame.transform.rotozoom(pygame.image.load(f"fig/{num}.png"), 0, 0.9)
+        screen.blit(self.img, self.rct)
+
+    def update(self, key_lst: list[bool], screen: pygame.Surface):
+        """
+        押下キーに応じてこうかとんを移動させる
+        引数1 key_lst：押下キーの真理値リスト
+        引数2 screen：画面Surface
+        """
+        sum_mv = [0, 0]
+        for k, mv in __class__.delta.items():
+            if key_lst[k]:
+                sum_mv[0] += mv[0]
+                sum_mv[1] += mv[1]
+        self.rct.move_ip(sum_mv)
+        if check_bound(self.rct) != (True, True):
+            self.rct.move_ip(-sum_mv[0], -sum_mv[1])
+        if not (sum_mv[0] == 0 and sum_mv[1] == 0):
+            self.img = __class__.imgs[tuple(sum_mv)]
+        screen.blit(self.img, self.rct)
 
 def load_highscore():
     """ゲーム起動時に最高スコアを読み込む関数"""
@@ -133,6 +206,8 @@ def main():
     start_ticks = 0
     time_left = 30
     
+    bg_img = pygame.image.load("fig/pg_bg.jpg").convert()
+
     running = True
     while running:
         # FPS（フレームレート）の設定
@@ -211,7 +286,7 @@ def main():
             #タイトル画面を（ドット風、中央揃え）
             title_text = large_font.render("FALLING CATCH GAME", True, ORANGE)  
             start_text = font.render("Press SPACE to Start", True, WHITE)  
-            
+
             title_rect=title_text.get_rect(center=(SCREEN_WIDTH//2,200))   #スタートタイトルの位置設定（画面中央ｘ＝400、y＝200）
             start_rect=start_text.get_rect(center=(SCREEN_WIDTH//2,400)) #スタート文字の位置設定（画面中央X＝400、ｙ＝400)
            
@@ -225,6 +300,8 @@ def main():
             # ［E君の合流ポイント①: 画面上部への「現在のスコア」や「残り時間」の文字描画］
             time_text = font.render(f"TIME: {int(time_left)}",True, WHITE)#追加G　残り時間の表示
             screen.blit(time_text, (20,20))
+
+            screen.blit(bg_img, [0, 0])
 
             # MVP確認用の暫定表示
             play_text = font.render("Playing... [Enter:Finish]", True, WHITE)
